@@ -1,0 +1,2 @@
+# battery_prediction_model_reproduction
+復現學長的鋰電池壽命預測模型
