@@ -1,2 +1,5 @@
-# battery_prediction_model_reproduction
-復現學長的鋰電池壽命預測模型
+# 鋰電池壽命預測模型復現
+
+復現的模型為學長發表的論文: [Deep neural network battery life and voltage prediction by using data of one cycle only](https://www.sciencedirect.com/science/article/pii/S0306261921014112?via%3Dihub)
+
+
