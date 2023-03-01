@@ -3,12 +3,6 @@ import torch.nn as nn
 from itertools import repeat
 
 
-def init_weights(m):
-    if isinstance(m, (nn.Linear, nn.Conv1d)):
-        torch.nn.init.xavier_uniform_(m.weight)
-        m.bias.data.fill_(0.00)
-
-
 class SpatialDropout(nn.Module):
     """
     spatial dropout是針對channel位置做dropout
