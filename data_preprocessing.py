@@ -1,17 +1,15 @@
-import os
-import random
 import numpy as np
 import matplotlib.pyplot as plt
 from torch.utils.data import Dataset
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from sklearn.preprocessing import StandardScaler
 
 
-class Severson_Dataset_Training(Dataset):
-    def __init__(self, train=True, pred_target='EOL', norm=True):
+class Feature_Selector_Dataset(Dataset):
+    def __init__(self, train=True, pred_target='EOL', part='discharge', norm=True):
         """pred_target可更改為EOL或chargetime"""
         self.train = train
         self.pred_target = pred_target
-        self.input, self.target = load_Severson(training=train, norm=norm)
+        self.input, self.target = load_Severson(training=train, norm=norm, part=part)
 
     def __getitem__(self, index):
         target_id = 0 if self.pred_target=='EOL' else 1
@@ -42,16 +40,13 @@ class Predictor1_Dataset(Dataset):
         trn_size, val_size = len(self.trn_input), len(self.val_input)
         target_index = [np.arange(trn_size)*100, np.arange(val_size)*100]
         target_scaler = get_scaler('both')[1]
-        feature_mean, feature_std = np.mean(np.mean(self.trn_input[:, :8, :], axis=0), axis=1), np.std(self.trn_input[:, :8, :].transpose((0, 2, 1)).reshape(-1, 8), axis=0)
-        for i in range(8):
+        feature_mean, feature_std = np.mean(np.mean(self.trn_input[:, :6, :], axis=0), axis=1), np.std(self.trn_input[:, :6, :].transpose((0, 2, 1)).reshape(-1, 6), axis=0)
+        for i in range(6):
             self.trn_input[:, i, :] = (self.trn_input[:, i, :]-feature_mean[i])/feature_std[i]
             self.val_input[:, i, :] = (self.val_input[:, i, :]-feature_mean[i])/feature_std[i]
-        # self.trn_input[:, :6, :] = feature_scaler.fit_transform(self.trn_input[:, :6, :].transpose((0, 2, 1)).reshape(-1, 6)).reshape(-1, 100, 6).transpose((0, 2, 1))
-        # self.val_input[:, :6, :] = feature_scaler.transform(self.val_input[:, :6, :].transpose((0, 2, 1)).reshape(-1, 6)).reshape(-1, 100, 6).transpose((0, 2, 1))
         self.trn_target, self.val_target = target_scaler.transform(self.trn_target[target_index[0]]), target_scaler.transform(self.val_target[target_index[1]])
+        # self.trn_target, self.val_target = self.trn_target[target_index[0]], self.val_target[target_index[1]]
 
-        weights = np.linspace(5, 1, 100).tolist()
-        random_padding = random.choices(range(100), weights=weights, k=50)
         if last_padding: # full last padding
             aug_trn_input, aug_trn_target = [], []
             for i in range(trn_size):
@@ -84,16 +79,67 @@ class Predictor1_Dataset(Dataset):
         plt.close()
 
 
-def load_Severson(training=True, norm=True):
+class Predictor3_Dataset(Dataset):
+    def __init__(self, train=True, last_padding=True):
+        self.train = train
+        self.fix = False
+        self.f_length = 0
+        folder = 'Severson_Dataset/feature_selector_discharge/'
+        self.trn_input, self.trn_target = np.load(folder+'predictor3_trn_feature.npy'), np.load(folder+'trn_targets.npy')
+        self.val_input, self.val_target = np.load(folder+'predictor3_val_feature.npy'), np.load(folder+'val_targets.npy')
+        trn_size, val_size = len(self.trn_input), len(self.val_input)
+        target_index = [np.arange(trn_size)*100, np.arange(val_size)*100]
+        target_scaler = get_scaler('both')[1]
+        feature_mean, feature_std = np.mean(np.mean(self.trn_input[:, :6, :], axis=0), axis=1), np.std(self.trn_input[:, :6, :].transpose((0, 2, 1)).reshape(-1, 6), axis=0)
+        for i in range(6):
+            self.trn_input[:, i, :] = (self.trn_input[:, i, :]-feature_mean[i])/feature_std[i]
+            self.val_input[:, i, :] = (self.val_input[:, i, :]-feature_mean[i])/feature_std[i]
+        self.trn_target, self.val_target = target_scaler.transform(self.trn_target[target_index[0]]), target_scaler.transform(self.val_target[target_index[1]])
+        # self.trn_target, self.val_target = self.trn_target[target_index[0]], self.val_target[target_index[1]]
+
+        if last_padding: # full last padding
+            aug_trn_input, aug_trn_target = [], []
+            for i in range(trn_size):
+                for cycle_length in range(100):
+                    after_padding = self.trn_input[i].copy()
+                    after_padding[:, cycle_length:] = after_padding[:, cycle_length].reshape(-1, 1).repeat(100-cycle_length, axis=1)
+                    aug_trn_input.append(after_padding)
+                    aug_trn_target.append(self.trn_target[i, :])
+            self.trn_input, self.trn_target = np.stack(aug_trn_input, axis=0), np.stack(aug_trn_target, axis=0)
+
+    def __getitem__(self, index):
+        if self.train:
+            feature, target = self.trn_input[index], self.trn_target[index, 0]
+        else:
+            feature, target = self.val_input[index], self.val_target[index, 0]
+        return feature, target
+
+    def __len__(self):
+        if self.train:
+            return len(self.trn_input)
+        return len(self.val_input)
+
+    def visualize(self, index, feature_id):
+        feature_list =  ['charge capacity', 'discharge capacity', 'chargetime', 'TAvg', 'TMin', 'TMax', 'EOL feature', 'chargetime feature']
+        curve = self.trn_input[index, feature_id, :]
+        plt.plot(np.arange(len(curve)), curve, c='red')
+        plt.ylabel(feature_list[feature_id], fontsize=14)
+        plt.xlabel('time', fontsize=14)
+        plt.show()
+        plt.close()
+
+
+def load_Severson(training=True, norm=True, part='discharge'):
     folder_path = 'Severson_Dataset/feature_selector_discharge/'
+    index = range(500) if part == 'charge' else range(500, 1000, 1)
     if training:
-        feature, target = np.load(folder_path+'trn_features.npy')[:, :, 500:], np.load(folder_path+'trn_targets.npy')
+        feature, target = np.load(folder_path+'trn_features.npy')[:, :, index], np.load(folder_path+'trn_targets.npy')
     else:
-        feature, target = np.load(folder_path+'val_features.npy')[:, :, 500:], np.load(folder_path+'val_targets.npy')
+        feature, target = np.load(folder_path+'val_features.npy')[:, :, index], np.load(folder_path+'val_targets.npy')
     if norm:
         return normalize(feature), normalize(target)
     else:
-        return feature, target
+        return normalize(feature), target
  
 
 def get_scaler(pred_target='EOL'):

@@ -3,8 +3,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 import torch
-from data_preprocessing import Severson_Dataset_Training
-from discharge_model import Dim_Reduction_1, Dim_Reduction_2
+from data_preprocessing import Feature_Selector_Dataset
+import discharge_model
+import full_model
 
 
 """
@@ -127,31 +128,67 @@ def train_val_split(train_ratio=0.8, seed=15, folder='Severson_Dataset/feature_s
 
 
 def predictor1_preprocess(folder='Severson_Dataset/feature_selector_discharge/'):
-    selector1 = torch.load('models/Feature_Selector1_best_seed39.pth')
-    selector2 = torch.load('models/Feature_Selector2_best_seed39.pth')
-    trn_set = Severson_Dataset_Training(train=True, pred_target='EOL')
-    val_set = Severson_Dataset_Training(train=False, pred_target='EOL')
+    selectors = []
+    for i in range(1, 3, 1):
+        model = discharge_model.__dict__['Dim_Reduction_'+str(i)](4, 1, 0.0).cuda()
+        model.load_state_dict(torch.load('models/discharge/Dim_Reduction_'+str(i)+'_seed41.pth'))
+        model.eval()
+        selectors.append(model)
+    trn_set = Feature_Selector_Dataset(train=True, pred_target='EOL', part='discharge')
+    val_set = Feature_Selector_Dataset(train=False, pred_target='EOL', part='discharge')
     trn_summary = np.load(folder+'trn_summary.npy')
     val_summary = np.load(folder+'val_summary.npy')
     trn_feature = np.zeros((len(trn_summary), 8, 100))
     val_feature = np.zeros((len(val_summary), 8, 100))
     trn_feature[:, :6, :] = trn_summary[:, :, :100]
     val_feature[:, :6, :] = val_summary[:, :, :100]
-    for i in range(len(trn_summary)):
-        feature_EOL = selector1(torch.tensor(trn_set[(100*i):(100*(i+1))][0]).cuda().float())
-        feature_chargetime = selector2(torch.tensor(trn_set[(100*i):(100*(i+1))][0]).cuda().float())
-        trn_feature[i, 6] = feature_EOL.detach().cpu().numpy().squeeze()
-        trn_feature[i, 7] = feature_chargetime.detach().cpu().numpy().squeeze()
-    for i in range(len(val_summary)):
-        feature_EOL = selector1(torch.tensor(val_set[(100*i):(100*(i+1))][0]).cuda().float())
-        feature_chargetime = selector2(torch.tensor(val_set[(100*i):(100*(i+1))][0]).cuda().float())
-        val_feature[i, 6] = feature_EOL.detach().cpu().numpy().squeeze()
-        val_feature[i, 7] = feature_chargetime.detach().cpu().numpy().squeeze()
+    with torch.no_grad():
+        for i in range(len(trn_summary)):
+            for j, slt in enumerate(selectors):
+                feature = slt(torch.tensor(trn_set[(100*i):(100*(i+1))][0]).cuda().float())
+                trn_feature[i, 6+j] = feature.detach().cpu().numpy().squeeze()
+        for i in range(len(val_summary)):
+            for j, slt in enumerate(selectors):
+                feature = slt(torch.tensor(val_set[(100*i):(100*(i+1))][0]).cuda().float())
+                val_feature[i, 6+j] = feature.detach().cpu().numpy().squeeze()
     np.save(folder+'predictor1_trn_feature', trn_feature)
     np.save(folder+'predictor1_val_feature', val_feature)
 
 
+def predictor3_preprocess(folder='Severson_Dataset/feature_selector_discharge/'):
+    selectors = []
+    for i in range(1, 5, 1):
+        model = full_model.__dict__['Dim_Reduction_'+str(i)](4, 1, 0.0).cuda()
+        model.load_state_dict(torch.load('models/full/Dim_Reduction_'+str(i)+'_seed41.pth'))
+        model.eval()
+        selectors.append(model)
+    dis_trn_set = Feature_Selector_Dataset(train=True, pred_target='EOL', part='discharge')
+    dis_val_set = Feature_Selector_Dataset(train=False, pred_target='EOL', part='discharge')
+    ch_trn_set = Feature_Selector_Dataset(train=True, pred_target='EOL', part='charge')
+    ch_val_set = Feature_Selector_Dataset(train=False, pred_target='EOL', part='charge')
+    trn_summary = np.load(folder+'trn_summary.npy')
+    val_summary = np.load(folder+'val_summary.npy')
+    trn_feature = np.zeros((len(trn_summary), 10, 100))
+    val_feature = np.zeros((len(val_summary), 10, 100))
+    trn_feature[:, :6, :] = trn_summary[:, :, :100]
+    val_feature[:, :6, :] = val_summary[:, :, :100]
+    with torch.no_grad():
+        for i in range(len(trn_summary)):
+            for j, slt in enumerate(selectors):
+                trn_set = dis_trn_set if j<2 else ch_trn_set
+                feature = slt(torch.tensor(trn_set[(100*i):(100*(i+1))][0]).cuda().float())
+                trn_feature[i, 6+j] = feature.detach().cpu().numpy().squeeze()
+        for i in range(len(val_summary)):
+            for j, slt in enumerate(selectors):
+                val_set = dis_val_set if j<2 else ch_val_set
+                feature = slt(torch.tensor(val_set[(100*i):(100*(i+1))][0]).cuda().float())
+                val_feature[i, 6+j] = feature.detach().cpu().numpy().squeeze()
+    np.save(folder+'predictor3_trn_feature', trn_feature)
+    np.save(folder+'predictor3_val_feature', val_feature)
+
+
 # mat_to_npy()
 # train_val_split()
-predictor1_preprocess()
+# predictor1_preprocess()
+# predictor3_preprocess()
 # data_visulaization()

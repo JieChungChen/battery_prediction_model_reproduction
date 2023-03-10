@@ -49,7 +49,7 @@ def conv_block(in_ch, out_ch, kernel_size, padding, activation=True):
 
 
 class Dim_Reduction_1(nn.Module):  # for EOL
-    def __init__(self, in_ch, out_ch):
+    def __init__(self, in_ch, out_ch, drop=0.2):
         super(Dim_Reduction_1, self).__init__()
         self.conv1_1 = conv_block(in_ch, 128, kernel_size=13, padding=6)
         self.conv1_2 = conv_block(128, 128, kernel_size=13, padding=6)
@@ -58,7 +58,7 @@ class Dim_Reduction_1(nn.Module):  # for EOL
         self.maxpool1_1 = nn.MaxPool1d(2, 2)
         self.maxpool1_2 = nn.MaxPool1d(2, 2)
         self.maxpool1_3 = nn.MaxPool1d(2, 2)
-        self.spacial_drop1 = SpatialDropout(0.2)
+        self.spacial_drop1 = SpatialDropout(drop)
         self.conv2_1 = conv_block(512, 64, kernel_size=17, padding=8)
         self.conv2_2 = conv_block(64, 64, kernel_size=17, padding=8)
         self.conv2_3 = conv_block(64, 192, kernel_size=3, padding=1)
@@ -70,7 +70,7 @@ class Dim_Reduction_1(nn.Module):  # for EOL
         self.conv3_2 = conv_block(32, 32, kernel_size=13, padding=6)
         self.conv3_3 = conv_block(32, 32, kernel_size=3, padding=1)
         self.conv3_4 = conv_block(32, 32, kernel_size=3, padding=1)
-        self.spatial_drop2 = SpatialDropout(0.2)
+        self.spatial_drop2 = SpatialDropout(drop)
         self.gloavgpool = nn.AdaptiveAvgPool1d(1)
         self.glomaxpool = nn.AdaptiveMaxPool1d(1)
         self.linear = nn.Linear(64, out_ch)
@@ -98,7 +98,7 @@ class Dim_Reduction_1(nn.Module):  # for EOL
 
 
 class Dim_Reduction_2(nn.Module):  # for chargetime
-    def __init__(self, in_ch, out_ch):
+    def __init__(self, in_ch, out_ch, drop=0.2):
         super(Dim_Reduction_2, self).__init__()
         self.conv1_1 = conv_block(in_ch, 128, kernel_size=13, padding=6)
         self.conv1_2 = conv_block(128, 128, kernel_size=13, padding=6)
@@ -107,7 +107,7 @@ class Dim_Reduction_2(nn.Module):  # for chargetime
         self.maxpool1_1 = nn.MaxPool1d(2, 2)
         self.maxpool1_2 = nn.MaxPool1d(2, 2)
         self.maxpool1_3 = nn.AvgPool1d(2, 2)
-        self.spacial_drop1 = SpatialDropout(0.2)
+        self.spacial_drop1 = SpatialDropout(drop)
         self.conv2_1 = conv_block(384, 32, kernel_size=17, padding=8)
         self.conv2_2 = conv_block(32, 32, kernel_size=17, padding=8)
         self.conv2_3 = conv_block(32, 64, kernel_size=3, padding=1)
@@ -119,7 +119,7 @@ class Dim_Reduction_2(nn.Module):  # for chargetime
         self.conv3_2 = conv_block(32, 32, kernel_size=3, padding=1)
         self.conv3_3 = conv_block(32, 96, kernel_size=9, padding=4)
         self.conv3_4 = conv_block(96, 96, kernel_size=9, padding=4)
-        self.spatial_drop2 = SpatialDropout(0.2)
+        self.spatial_drop2 = SpatialDropout(drop)
         self.gloavgpool = nn.AdaptiveAvgPool1d(1)
         self.glomaxpool = nn.AdaptiveMaxPool1d(1)
         self.linear = nn.Linear(128, out_ch)
@@ -147,7 +147,7 @@ class Dim_Reduction_2(nn.Module):  # for chargetime
 
 
 class Dim_Reduction_3(nn.Module):  # for EOL
-    def __init__(self, in_ch, out_ch):
+    def __init__(self, in_ch, out_ch, drop=0.2):
         super(Dim_Reduction_3, self).__init__()
         self.conv1_1 = conv_block(in_ch, 128, kernel_size=17, padding=8)
         self.conv1_2 = conv_block(128, 128, kernel_size=17, padding=8)
@@ -156,7 +156,7 @@ class Dim_Reduction_3(nn.Module):  # for EOL
         self.maxpool1_1 = nn.MaxPool1d(2, 2)
         self.maxpool1_2 = nn.MaxPool1d(2, 2)
         self.maxpool1_3 = nn.MaxPool1d(2, 2)
-        self.spacial_drop1 = SpatialDropout(0.2)
+        self.spacial_drop1 = SpatialDropout(drop)
         self.conv2_1 = conv_block(512, 64, kernel_size=17, padding=8)
         self.conv2_2 = conv_block(64, 64, kernel_size=17, padding=8)
         self.conv2_3 = conv_block(64, 192, kernel_size=3, padding=1)
@@ -196,7 +196,7 @@ class Dim_Reduction_3(nn.Module):  # for EOL
 
 
 class Dim_Reduction_4(nn.Module):  # for chargetime
-    def __init__(self, in_ch, out_ch):
+    def __init__(self, in_ch, out_ch, drop=0.2):
         super(Dim_Reduction_4, self).__init__()
         self.conv1_1 = conv_block(in_ch, 256, kernel_size=15, padding=7)
         self.conv1_2 = conv_block(256, 256, kernel_size=15, padding=7)
@@ -205,7 +205,7 @@ class Dim_Reduction_4(nn.Module):  # for chargetime
         self.maxpool1_1 = nn.AvgPool1d(2, 2)
         self.maxpool1_2 = nn.AvgPool1d(2, 2)
         self.maxpool1_3 = nn.AvgPool1d(2, 2)
-        self.spacial_drop1 = SpatialDropout(0.2)
+        self.spacial_drop1 = SpatialDropout(drop)
         self.conv2_1 = conv_block(768, 32, kernel_size=3, padding=1)
         self.conv2_2 = conv_block(32, 32, kernel_size=3, padding=1)
         self.conv2_3 = conv_block(32, 64, kernel_size=3, padding=1)
@@ -217,7 +217,7 @@ class Dim_Reduction_4(nn.Module):  # for chargetime
         self.conv3_2 = conv_block(128, 128, kernel_size=17, padding=8)
         self.conv3_3 = conv_block(128, 256, kernel_size=7, padding=3)
         self.conv3_4 = conv_block(256, 256, kernel_size=7, padding=3)
-        self.spatial_drop2 = SpatialDropout(0.2)
+        self.spatial_drop2 = SpatialDropout(drop)
         self.gloavgpool = nn.AdaptiveAvgPool1d(1)
         self.glomaxpool = nn.AdaptiveMaxPool1d(1)
         self.linear = nn.Linear(384, out_ch)
@@ -258,26 +258,26 @@ class Predictor_3(nn.Module):  # for EOL and discharge time
         self.gloavgpool1 = nn.AdaptiveAvgPool1d(1)
         self.gloavgpool2 = nn.AdaptiveAvgPool1d(1)
         self.conv3 = nn.Sequential(
-            conv_block(1, 128, kernel_size=9, padding=4),
-            conv_block(128, 256, kernel_size=15, padding=7),
-            conv_block(256, 64, kernel_size=5, padding=2)
+            conv_block(1, 128, kernel_size=9, padding=0),
+            conv_block(128, 256, kernel_size=15, padding=0),
+            conv_block(256, 64, kernel_size=5, padding=0)
         )
         self.glomaxpool3 = nn.AdaptiveMaxPool1d(1)
         self.gloavgpool3 = nn.AdaptiveAvgPool1d(1)
         self.conv4 = nn.Sequential(
-            conv_block(1, 32, kernel_size=7, padding=3),
-            conv_block(32, 128, kernel_size=5, padding=2),
-            conv_block(128, 128, kernel_size=9, padding=4)
+            conv_block(1, 32, kernel_size=7, padding=0),
+            conv_block(32, 128, kernel_size=5, padding=0),
+            conv_block(128, 128, kernel_size=9, padding=0)
         )
         self.glomaxpool4 = nn.AdaptiveMaxPool1d(1)
         self.gloavgpool4 = nn.AdaptiveAvgPool1d(1)
         self.conv5 = nn.Sequential(
-            conv_block(1, 256, kernel_size=13, padding=6),
-            conv_block(256, 256, kernel_size=7, padding=3),
-            conv_block(256, 64, kernel_size=7, padding=3)
+            conv_block(1, 256, kernel_size=13, padding=0),
+            conv_block(256, 256, kernel_size=7, padding=0),
+            conv_block(256, 64, kernel_size=7, padding=0)
         )
         self.glomaxpool5 = nn.AdaptiveMaxPool1d(1)
-        self.gloavgpool6 = nn.AdaptiveAvgPool1d(1)
+        self.gloavgpool5 = nn.AdaptiveAvgPool1d(1)
         self.linear1 = nn.Linear(64, out_ch)
         self.linear2 = nn.Linear(128, out_ch)
         self.linear3 = nn.Linear(64, out_ch)

@@ -3,12 +3,6 @@ import torch.nn as nn
 from itertools import repeat
 
 
-def init_weights(m):
-    if isinstance(m, (nn.Linear, nn.Conv1d)):
-        torch.nn.init.xavier_uniform_(m.weight)
-        m.bias.data.fill_(0.00)
-
-
 class SpatialDropout(nn.Module):
     """
     spatial dropout是針對channel位置做dropout
@@ -55,7 +49,7 @@ def conv_block(in_ch, out_ch, kernel_size, padding, activation=True):
 
 
 class Dim_Reduction_1(nn.Module):  # for EOL/RUL
-    def __init__(self, in_ch, out_ch):
+    def __init__(self, in_ch, out_ch, drop=0.2):
         super(Dim_Reduction_1, self).__init__()
         self.conv1_1 = conv_block(in_ch, 32, kernel_size=5, padding=2)
         self.conv1_2 = conv_block(32, 32, kernel_size=5, padding=2)
@@ -64,7 +58,7 @@ class Dim_Reduction_1(nn.Module):  # for EOL/RUL
         self.maxpool1_1 = nn.MaxPool1d(2, 2)
         self.maxpool1_2 = nn.MaxPool1d(2, 2)
         self.maxpool1_3 = nn.MaxPool1d(2, 2)
-        self.spacial_drop1 = SpatialDropout(0.16)
+        self.spacial_drop1 = SpatialDropout(drop)
         self.conv2_1 = conv_block(64, 32, kernel_size=11, padding=5)
         self.conv2_2 = conv_block(32, 32, kernel_size=11, padding=5)
         self.conv2_3 = conv_block(32, 64, kernel_size=7, padding=3)
@@ -76,7 +70,7 @@ class Dim_Reduction_1(nn.Module):  # for EOL/RUL
         self.conv3_2 = conv_block(256, 256, kernel_size=7, padding=3)
         self.conv3_3 = conv_block(256, 256, kernel_size=5, padding=2)
         self.conv3_4 = conv_block(256, 256, kernel_size=5, padding=2)
-        self.spatial_drop2 = SpatialDropout(0.16)
+        self.spatial_drop2 = SpatialDropout(drop)
         self.gloavgpool = nn.AdaptiveAvgPool1d(1)
         self.glomaxpool = nn.AdaptiveMaxPool1d(1)
         self.linear = nn.Linear(512, out_ch)
@@ -104,7 +98,7 @@ class Dim_Reduction_1(nn.Module):  # for EOL/RUL
 
 
 class Dim_Reduction_2(nn.Module):  # for charge time
-    def __init__(self, in_ch, out_ch):
+    def __init__(self, in_ch, out_ch, drop=0.2):
         super(Dim_Reduction_2, self).__init__()
         self.conv1_1 = conv_block(in_ch, 128, kernel_size=11, padding=5)
         self.conv1_2 = conv_block(128, 128, kernel_size=11, padding=5)
@@ -112,7 +106,7 @@ class Dim_Reduction_2(nn.Module):  # for charge time
         self.conv1_4 = conv_block(128, 128, kernel_size=5, padding=2)
         self.avgpool1_1 = nn.AvgPool1d(2, 2)
         self.avgpool1_2 = nn.AvgPool1d(2, 2)
-        self.spacial_drop1 = SpatialDropout(0.16)
+        self.spacial_drop1 = SpatialDropout(drop)
         self.conv2_1 = conv_block(256, 128, kernel_size=3, padding=1)
         self.conv2_2 = conv_block(128, 128, kernel_size=3, padding=1)
         self.conv2_3 = conv_block(128, 128, kernel_size=5, padding=2)
@@ -154,19 +148,20 @@ class Predictor_1(nn.Module):  # for EOL and discharge time
         # attention layer
         self.conv2_1 = conv_block(256, 64, kernel_size=11, padding=5)
         self.conv2_2 = conv_block(256, 64, kernel_size=7, padding=3)
-        self.gloavgpool1 = nn.AvgPool1d(50, 1)
-        self.gloavgpool2 = nn.AvgPool1d(50, 1)
+        self.sig = nn.Sigmoid()
+        self.gloavgpool1 = nn.AdaptiveAvgPool1d(1)
+        self.gloavgpool2 = nn.AdaptiveAvgPool1d(1)
         self.conv3 = nn.Sequential(
-            conv_block(1, 64, kernel_size=9, padding=4),
-            conv_block(64, 32, kernel_size=7, padding=3),
-            conv_block(32, 128, kernel_size=7, padding=3)
+            conv_block(1, 64, kernel_size=9, padding=0),
+            conv_block(64, 32, kernel_size=7, padding=0),
+            conv_block(32, 128, kernel_size=7, padding=0)
         )
-        self.glomaxpool3 = nn.MaxPool1d(114, 1)
-        self.gloavgpool3 = nn.AvgPool1d(114, 1)
+        self.glomaxpool3 = nn.AdaptiveMaxPool1d(1)
+        self.gloavgpool3 = nn.AdaptiveAvgPool1d(1)
         self.conv4 = nn.Sequential(
-            conv_block(1, 128, kernel_size=7, padding=3),
-            conv_block(128, 256, kernel_size=11, padding=5),
-            conv_block(256, 256, kernel_size=3, padding=1)
+            conv_block(1, 128, kernel_size=7, padding=0),
+            conv_block(128, 256, kernel_size=11, padding=0),
+            conv_block(256, 256, kernel_size=3, padding=0)
         )
         self.glomaxpool4 = nn.AdaptiveMaxPool1d(1)
         self.gloavgpool4 = nn.AdaptiveAvgPool1d(1)
@@ -181,7 +176,7 @@ class Predictor_1(nn.Module):  # for EOL and discharge time
         x = self.avgpool1(x)
         att1 = self.conv2_1(x)
         att2 = self.conv2_2(x)
-        x = torch.matmul(torch.transpose(att1, 1, 2), att2)
+        x = self.sig(torch.matmul(torch.transpose(att1, 1, 2), att2))
         x = torch.cat((self.gloavgpool1(att1), self.gloavgpool2(x)), dim=1).squeeze().unsqueeze(1)
         conv3 = self.conv3(x)
         conv3 = torch.add(self.glomaxpool3(conv3), self.gloavgpool3(conv3)).squeeze()
@@ -190,46 +185,4 @@ class Predictor_1(nn.Module):  # for EOL and discharge time
         out_eol = self.linear1(conv3)
         out_ctime = self.linear2(conv4)
         return torch.cat((out_eol, out_ctime), dim=1)
-
-
-class Predictor_ITRI(nn.Module):  # for EOL and discharge time
-    def __init__(self, in_ch, out_ch, drop=0.16):
-        super(Predictor_ITRI, self).__init__()
-        self.conv1_1 = conv_block(in_ch, 64, kernel_size=11, padding=5)
-        self.conv1_2 = conv_block(64, 128, kernel_size=7, padding=3)
-        self.conv1_3 = conv_block(128, 256, kernel_size=5, padding=2)
-        self.spacial_drop1 = SpatialDropout(drop)
-        self.avgpool1 = nn.AvgPool1d(2, 2)
-        # for p in self.parameters():
-        #     p.requires_grad=False
-        # attention layer
-        self.conv2_1 = conv_block(256, 64, kernel_size=11, padding=5)
-        self.conv2_2 = conv_block(256, 64, kernel_size=7, padding=3)
-        self.gloavgpool1 = nn.AvgPool1d(50, 1)
-        self.gloavgpool2 = nn.AvgPool1d(50, 1)
-        self.conv3 = nn.Sequential(
-            conv_block(1, 64, kernel_size=9, padding=4),
-            conv_block(64, 32, kernel_size=7, padding=3),
-            conv_block(32, 128, kernel_size=7, padding=3)
-        )
-        self.glomaxpool3 = nn.MaxPool1d(114, 1)
-        self.gloavgpool3 = nn.AvgPool1d(114, 1)
-        self.glomaxpool4 = nn.MaxPool1d(114, 1)
-        self.gloavgpool4 = nn.AvgPool1d(114, 1)
-        self.linear_qdratio = nn.Linear(128, out_ch)
-    
-    def forward(self, x):
-        x = self.conv1_1(x)
-        x = self.conv1_2(x)
-        x = self.conv1_3(x)
-        x = self.spacial_drop1(x)
-        x = self.avgpool1(x)
-        att1 = self.conv2_1(x)
-        att2 = self.conv2_2(x)
-        x = torch.matmul(torch.transpose(att1, 1, 2), att2)
-        x = torch.cat((self.gloavgpool1(att1), self.gloavgpool2(x)), dim=1).squeeze().unsqueeze(1)
-        conv3 = self.conv3(x)
-        conv3 = torch.add(self.glomaxpool3(conv3), self.gloavgpool3(conv3)).squeeze()
-        out_eol = self.linear_qdratio(conv3)
-        return out_eol
     

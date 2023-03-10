@@ -2,8 +2,9 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
+import torch.nn as nn
 from torch.utils.data import DataLoader
-from data_preprocessing import get_scaler, Predictor1_Dataset
+from data_preprocessing import get_scaler, Predictor1_Dataset, Predictor3_Dataset
 
 
 def pred_result(model, dataset, which_set, pred_target):
@@ -39,7 +40,7 @@ def pred_result(model, dataset, which_set, pred_target):
 
 def real_RMSE_and_MAPE(model, loader, pred_target):
     """
-    計算dimreduct1, dimreduct2的真實誤差(RMSE, MAPE)
+    計算dimreduct的真實誤差(RMSE, MAPE)
     """
     _, scaler_y = get_scaler(pred_target=pred_target)
     model.eval()
@@ -48,13 +49,12 @@ def real_RMSE_and_MAPE(model, loader, pred_target):
         for inputs, targets in loader:
             outputs = model(inputs.cuda().float())
             pred.append(outputs.detach().cpu().numpy())
-            gt.append(targets)
+            gt.append(targets.numpy())
 
     gt, pred = np.concatenate(gt, axis=0).reshape(-1, 1), np.concatenate(pred, axis=0).reshape(-1, 1)
     gt, pred = scaler_y.inverse_transform(gt), scaler_y.inverse_transform(pred)
-    n = len(gt)
-    rmse = np.sqrt(np.sum(np.square(gt[:, 0]-pred[:, 0]))/n)
-    mape = np.sum(np.abs(pred[:, 0]-gt[:, 0])/gt[:, 0])/n
+    rmse = np.sqrt(np.mean((gt[:, 0]-pred[:, 0])**2))
+    mape = np.mean(np.abs(pred[:, 0]-gt[:, 0])/gt[:, 0])
     return rmse, mape
 
 
@@ -90,51 +90,107 @@ def predictor1_model_evaluation(model, best_error, eval_length=[0, 19, 99]):
     """
     根據不同input length評估Predictor1之預測誤差
     """
-    _, scaler_y = get_scaler()
+    _, scaler_y = get_scaler('both')
 
     model.eval()
     trn_rmse, test_rmse = [], []
     trn_set = Predictor1_Dataset(train=True, last_padding=False)
     test_set = Predictor1_Dataset(train=False, last_padding=False)
+    trn_loader = DataLoader(trn_set, batch_size=92, num_workers=0, drop_last=False, shuffle=False)
+    test_loader = DataLoader(test_set, batch_size=23, num_workers=0, drop_last=False, shuffle=False)
     for cycles in eval_length:
-        trn_loader = DataLoader(trn_set, batch_size=92, num_workers=0, drop_last=False, shuffle=False)
-        test_loader = DataLoader(test_set, batch_size=23, num_workers=0, drop_last=False, shuffle=False)
         with torch.no_grad():
             for inputs, targets in test_loader:
                 for i in range(len(inputs)):
                     inputs[i, :, cycles:] = inputs[i, :, cycles].reshape(-1, 1).repeat(1, 100-cycles)
                 outputs = model(inputs.cuda().float()).reshape(-1, 2)
                 pred = outputs.detach().cpu().numpy()
-                gt = targets.reshape(-1, 2)
+                gt = targets.numpy().reshape(-1, 2)
                 gt, pred = scaler_y.inverse_transform(gt), scaler_y.inverse_transform(pred)
-                n = len(gt)
-                rmse = np.sqrt(np.sum(np.square(gt[:, 0]-pred[:, 0]))/n)
-                test_rmse.append(rmse)
+                test_rmse.append(root_mean_square_err(gt[:, 0], pred[:, 0]))
 
             if cycles==99 and test_rmse[2]<best_error:
                 ax = plt.gca()
                 ax.set_aspect(1)
                 plt.plot([0, 2000], [0, 2000], ls='--', c='black')
-                plt.scatter(gt, pred, c='blue', s=6, label='testing')
+                plt.scatter(gt[:, 0], pred[:, 0], c='blue', s=6, label='testing', zorder=5)
 
             for inputs, targets in trn_loader:
                 for i in range(len(inputs)):
                     inputs[i, :, cycles:] = inputs[i, :, cycles].reshape(-1, 1).repeat(1, 100-cycles)
                 outputs = model(inputs.cuda().float()).reshape(-1, 2)
                 pred = outputs.detach().cpu().numpy()
-                gt = targets.reshape(-1, 2)
+                gt = targets.numpy().reshape(-1, 2)
                 gt, pred = scaler_y.inverse_transform(gt), scaler_y.inverse_transform(pred)
-                n = len(gt)
-                rmse = np.sqrt(np.sum(np.square(gt[:, 0]-pred[:, 0]))/n)
-                # mape = np.sum(np.abs(pred-gt)/gt)/n
-                trn_rmse.append(rmse)
+                trn_rmse.append(root_mean_square_err(gt[:, 0], pred[:, 0]))
 
             if cycles==99 and test_rmse[2]<best_error:
-                plt.scatter(gt, pred, c='red', s=6, label='training')
+                plt.scatter(gt[:, 0], pred[:, 0], c='red', s=6, label='training', zorder=1)
                 plt.legend()
                 plt.xlabel('ground truth', fontsize=14)
-                plt.xlabel('prediction', fontsize=14)
+                plt.ylabel('prediction', fontsize=14)
                 plt.savefig(str(cycles)+'-cycle prediction.png')
                 plt.close()
                 
     return trn_rmse, test_rmse
+
+
+def predictor3_model_evaluation(model, best_error, eval_length=[0, 19, 99]):
+    """
+    根據不同input length評估Predictor3之預測誤差
+    """
+    _, scaler_y = get_scaler('EOL')
+
+    model.eval()
+    trn_rmse, test_rmse = [], []
+    trn_set = Predictor3_Dataset(train=True, last_padding=False)
+    test_set = Predictor3_Dataset(train=False, last_padding=False)
+    trn_loader = DataLoader(trn_set, batch_size=92, num_workers=0, drop_last=False, shuffle=False)
+    test_loader = DataLoader(test_set, batch_size=23, num_workers=0, drop_last=False, shuffle=False)
+    for cycles in eval_length:
+        with torch.no_grad():
+            for inputs, targets in test_loader:
+                for i in range(len(inputs)):
+                    inputs[i, :, cycles:] = inputs[i, :, cycles].reshape(-1, 1).repeat(1, 100-cycles)
+                outputs = model(inputs.cuda().float()).reshape(-1, 1)
+                pred = outputs.detach().cpu().numpy()
+                gt = targets.numpy().reshape(-1, 1)
+                gt, pred = scaler_y.inverse_transform(gt), scaler_y.inverse_transform(pred)
+                test_rmse.append(root_mean_square_err(gt[:, 0], pred[:, 0]))
+
+            if cycles==99 and test_rmse[2]<best_error:
+                ax = plt.gca()
+                ax.set_aspect(1)
+                plt.plot([0, 2000], [0, 2000], ls='--', c='black', alpha=0.5)
+                plt.scatter(gt[:, 0], pred[:, 0], c='blue', s=6, label='testing', zorder=5)
+
+            for inputs, targets in trn_loader:
+                for i in range(len(inputs)):
+                    inputs[i, :, cycles:] = inputs[i, :, cycles].reshape(-1, 1).repeat(1, 100-cycles)
+                outputs = model(inputs.cuda().float()).reshape(-1, 1)
+                pred = outputs.detach().cpu().numpy()
+                gt = targets.numpy().reshape(-1, 1)
+                gt, pred = scaler_y.inverse_transform(gt), scaler_y.inverse_transform(pred)
+                trn_rmse.append(root_mean_square_err(gt[:, 0], pred[:, 0]))
+
+            if cycles==99 and test_rmse[2]<best_error:
+                plt.scatter(gt[:, 0], pred[:, 0], c='red', s=6, label='training', zorder=1)
+                plt.legend()
+                plt.xlabel('ground truth', fontsize=14)
+                plt.ylabel('prediction', fontsize=14)
+                plt.savefig(str(cycles)+'-cycle prediction.png')
+                plt.close()
+    return trn_rmse, test_rmse
+
+
+def root_mean_square_err(gt, pred):
+    return np.sqrt(np.mean((gt-pred)**2))
+
+
+def init_weights(m):
+    if isinstance(m, nn.Conv1d):
+        torch.nn.init.xavier_normal_(m.weight)
+        m.bias.data.fill_(0.00)
+    elif isinstance(m, nn.Linear):
+        torch.nn.init.normal_(m.weight, 0.1)
+        m.bias.data.fill_(0.00)
