@@ -1,0 +1,1 @@
+儲存discharge model的參數
