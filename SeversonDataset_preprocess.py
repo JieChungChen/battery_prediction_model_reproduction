@@ -16,7 +16,9 @@ import full_model
 """
 def mat_to_npy(save_path='Severson_Dataset/npdata_each_cell/', cycle_length=100):
     """
-    將mat檔中需要的資料截取至pkl檔
+    將mat檔中需要的資料截取至npy檔
+    包含各電池summary(所有cycle的Qc, Qd, Tmin, Tmax, Tavg, Chargetime)
+    以及partial資訊(到cycle_length為止的各cycle Q, V, I ,T)
     """
     filename = ['Severson_Dataset/2017-05-12_batchdata_updated_struct_errorcorrect.mat',
                 'Severson_Dataset/2017-06-30_batchdata_updated_struct_errorcorrect.mat',
@@ -77,9 +79,9 @@ def linear_interpolation(seq, points=500):
     return np.vstack(interp_list)
 
 
-def data_visulaization():
+def data_visualization():
     path = 'Severson_Dataset/npdata_each_cell/'
-    cmap = plt.get_cmap('coolwarm')
+    cmap = plt.get_cmap('coolwarm_r')
     filename = sorted(os.listdir(path))
     print('n cells: %d' % (len(filename)//2))
     eols = []
@@ -87,24 +89,24 @@ def data_visulaization():
         summary = np.load(path+filename[2*i+1])
         eol = summary.shape[1]
         eols.append(eol)
-        plt.plot(np.arange(eol-1), summary[1, 1:], c=cmap(1-(eol-326)/(1934-326)), alpha=0.7)
-    print(min(eols), max(eols))
-    # plt.colorbar()
+        plt.plot(np.arange(eol-1), summary[1, 1:], c=cmap((eol-200)/1800), alpha=0.7)
+    print("min EOL: %d, max EOL: %d"%(min(eols), max(eols)))
+    sm = plt.cm.ScalarMappable(norm=plt.Normalize(vmin=200, vmax=2000),cmap='coolwarm_r')
+    sm.set_array([])
+    plt.colorbar(sm)
+    plt.ylabel('capacity(Ah)')
+    plt.xlabel('cycle')
     plt.show()
     plt.close()
 
-def train_val_split(train_ratio=0.8, seed=15, folder='Severson_Dataset/feature_selector_discharge/'):
-    """
-    分成三組: EoL<600, 600<=EoL<=1200, EoL>1200
-    training, validation和testing要平均分配樣本
-    high:mid:low = 46:67:8
-    """
-    path = 'Severson_Dataset/npdata_each_cell/'
-    filename = sorted(os.listdir(path))
+    
+def train_val_split(train_ratio=0.8, seed=15, save_path='Severson_Dataset/feature_selector_discharge/'):
+    load_path = 'Severson_Dataset/npdata_each_cell/'
+    filename = sorted(os.listdir(load_path))
     features, targets, all_summary = [], [], []
     for i in range((len(filename))//2):
-        curve = np.load(path+filename[2*i])
-        summary = np.load(path+filename[2*i+1])
+        curve = np.load(load_path+filename[2*i])
+        summary = np.load(load_path+filename[2*i+1])
         eol, chargetime_end = len(summary[0]), summary[5, -1]
         features.append(curve)
         targets.append(np.array([eol, chargetime_end]))
@@ -119,12 +121,12 @@ def train_val_split(train_ratio=0.8, seed=15, folder='Severson_Dataset/feature_s
     all_summary = [f[2] for f in dataset]
     split_point = int(len(targets)*train_ratio)
     print(np.concatenate(all_summary[:split_point]).shape)
-    np.save(folder+'trn_features', np.concatenate(features[:split_point]))
-    np.save(folder+'val_features', np.concatenate(features[split_point:]))
-    np.save(folder+'trn_targets', np.repeat(np.vstack(targets[:split_point]), 100, axis=0))
-    np.save(folder+'val_targets', np.repeat(np.vstack(targets[split_point:]), 100, axis=0))
-    np.save(folder+'trn_summary', np.vstack(all_summary[:split_point]))
-    np.save(folder+'val_summary', np.vstack(all_summary[split_point:]))
+    np.save(save_path+'trn_features', np.concatenate(features[:split_point]))
+    np.save(save_path+'val_features', np.concatenate(features[split_point:]))
+    np.save(save_path+'trn_targets', np.repeat(np.vstack(targets[:split_point]), 100, axis=0))
+    np.save(save_path+'val_targets', np.repeat(np.vstack(targets[split_point:]), 100, axis=0))
+    np.save(save_path+'trn_summary', np.vstack(all_summary[:split_point]))
+    np.save(save_path+'val_summary', np.vstack(all_summary[split_point:]))
 
 
 def predictor1_preprocess(folder='Severson_Dataset/feature_selector_discharge/'):
@@ -185,10 +187,3 @@ def predictor3_preprocess(folder='Severson_Dataset/feature_selector_discharge/')
                 val_feature[i, 6+j] = feature.detach().cpu().numpy().squeeze()
     np.save(folder+'predictor3_trn_feature', trn_feature)
     np.save(folder+'predictor3_val_feature', val_feature)
-
-
-# mat_to_npy()
-# train_val_split()
-# predictor1_preprocess()
-# predictor3_preprocess()
-# data_visulaization()
