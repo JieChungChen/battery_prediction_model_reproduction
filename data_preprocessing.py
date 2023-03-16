@@ -6,7 +6,12 @@ from sklearn.preprocessing import StandardScaler
 
 class Feature_Selector_Dataset(Dataset):
     def __init__(self, train=True, pred_target='EOL', part='discharge', norm=True):
-        """pred_target可更改為EOL或chargetime"""
+        """
+        train(bool): training or testing set
+        pred_target(str): 'EOL' or 'chargetime'
+        part(str): 'discharge' or 'charge'
+        norm(bool): apply normalizarion to target 
+        """
         self.train = train
         self.pred_target = pred_target
         self.input, self.target = load_Severson(training=train, norm=norm, part=part)
@@ -20,7 +25,7 @@ class Feature_Selector_Dataset(Dataset):
         return len(self.input)
 
     def visualize(self, index, feature_id):
-        feature_list =  ['Voltage(V)', 'Discharge capacity(Ah)', 'Current', 'Temperature']
+        feature_list =  ['Voltage', 'Discharge capacity', 'Current', 'Temperature']
         curve = self.input[index, feature_id, :]
         plt.plot(np.arange(len(curve)), curve, c='red')
         plt.ylabel(feature_list[feature_id], fontsize=14)
