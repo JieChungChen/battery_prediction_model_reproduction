@@ -45,10 +45,10 @@ class Predictor1_Dataset(Dataset):
         trn_size, val_size = len(self.trn_input), len(self.val_input)
         target_index = [np.arange(trn_size)*100, np.arange(val_size)*100]
         target_scaler = get_scaler('both')[1]
-        feature_mean, feature_std = np.mean(np.mean(self.trn_input[:, :6, :], axis=0), axis=1), np.std(self.trn_input[:, :6, :].transpose((0, 2, 1)).reshape(-1, 6), axis=0)
+        feature_mean, feature_std = np.mean(np.mean(self.trn_input[:, :6, :], axis=0), axis=1), np.std(self.trn_input[:, :6, :].transpose((1, 0, 2)).reshape(6, -1), axis=1)
         for i in range(6):
-            self.trn_input[:, i, :] = (self.trn_input[:, i, :]-feature_mean[i])/feature_std[i]
-            self.val_input[:, i, :] = (self.val_input[:, i, :]-feature_mean[i])/feature_std[i]
+            self.trn_input[:, i, :] = (self.trn_input[:, i, :].copy()-feature_mean[i])/feature_std[i]
+            self.val_input[:, i, :] = (self.val_input[:, i, :].copy()-feature_mean[i])/feature_std[i]
         self.trn_target, self.val_target = target_scaler.transform(self.trn_target[target_index[0]]), target_scaler.transform(self.val_target[target_index[1]])
         # self.trn_target, self.val_target = self.trn_target[target_index[0]], self.val_target[target_index[1]]
 

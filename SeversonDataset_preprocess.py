@@ -25,7 +25,7 @@ def mat_to_npy(save_path='Severson_Dataset/npdata_each_cell/', cycle_length=100)
                 'Severson_Dataset/2018-04-12_batchdata_updated_struct_errorcorrect.mat']
 
     # 各batch中discharge部分有問題的電池 要加以清理
-    b1_err = [0, 1, 2, 3, 4, 8, 10, 12, 13, 18, 22, 14, 15]
+    b1_err = [0, 1, 2, 3, 4, 5, 8, 10, 12, 13, 18, 14, 15]
     b2_err = [1, 6, 9, 10, 21, 25, 12, 15, 44]
     b3_err = [23, 32, 37]
     err_list = [b1_err, b2_err, b3_err]
@@ -48,8 +48,11 @@ def mat_to_npy(save_path='Severson_Dataset/npdata_each_cell/', cycle_length=100)
             key = batch_name[b] + str(i).zfill(2)
             # 儲存循環間資訊
             summary = np.vstack([Qc_summary, Qd_summary, Tmin, Tmax, Tavg, Chargetime]) # shape:(6, n_cycle)
-            np.save(save_path+key+'_summary', summary)
-            
+            if b==0:
+                np.save(save_path+key+'_summary', summary[:, 1:])
+            else:
+                np.save(save_path+key+'_summary', summary)
+
             cycles = f[batch['cycles'][i, 0]]
             cycle_info = []
             for j in range(1, cycle_length+1): # 選擇前n個cyle
@@ -79,7 +82,8 @@ def linear_interpolation(seq, points=500):
     return np.vstack(interp_list)
 
 
-def data_visualization():
+def data_visualization(f_id):
+    feature_list = ['charge capacity', 'discharge capacity', 'chargetime', 'TAvg', 'TMin', 'TMax']
     path = 'Severson_Dataset/npdata_each_cell/'
     cmap = plt.get_cmap('coolwarm_r')
     filename = sorted(os.listdir(path))
@@ -89,12 +93,12 @@ def data_visualization():
         summary = np.load(path+filename[2*i+1])
         eol = summary.shape[1]
         eols.append(eol)
-        plt.plot(np.arange(eol-1), summary[1, 1:], c=cmap((eol-200)/1800), alpha=0.7)
+        plt.plot(np.arange(eol), summary[f_id, :], c=cmap((eol-200)/1800), alpha=0.7)
     print("min EOL: %d, max EOL: %d"%(min(eols), max(eols)))
     sm = plt.cm.ScalarMappable(norm=plt.Normalize(vmin=200, vmax=2000),cmap='coolwarm_r')
     sm.set_array([])
     plt.colorbar(sm)
-    plt.ylabel('capacity(Ah)')
+    plt.ylabel(feature_list[f_id])
     plt.xlabel('cycle')
     plt.show()
     plt.close()
@@ -120,13 +124,12 @@ def train_val_split(train_ratio=0.8, seed=15, save_path='Severson_Dataset/featur
     targets = [f[1] for f in dataset]
     all_summary = [f[2] for f in dataset]
     split_point = int(len(targets)*train_ratio)
-    print(np.concatenate(all_summary[:split_point]).shape)
     np.save(save_path+'trn_features', np.concatenate(features[:split_point]))
     np.save(save_path+'val_features', np.concatenate(features[split_point:]))
     np.save(save_path+'trn_targets', np.repeat(np.vstack(targets[:split_point]), 100, axis=0))
     np.save(save_path+'val_targets', np.repeat(np.vstack(targets[split_point:]), 100, axis=0))
-    np.save(save_path+'trn_summary', np.vstack(all_summary[:split_point]))
-    np.save(save_path+'val_summary', np.vstack(all_summary[split_point:]))
+    np.save(save_path+'trn_summary', np.concatenate(all_summary[:split_point]))
+    np.save(save_path+'val_summary', np.concatenate(all_summary[split_point:]))
 
 
 def predictor1_preprocess(folder='Severson_Dataset/feature_selector_discharge/'):
@@ -142,17 +145,17 @@ def predictor1_preprocess(folder='Severson_Dataset/feature_selector_discharge/')
     val_summary = np.load(folder+'val_summary.npy')
     trn_feature = np.zeros((len(trn_summary), 8, 100))
     val_feature = np.zeros((len(val_summary), 8, 100))
-    trn_feature[:, :6, :] = trn_summary[:, :, :100]
-    val_feature[:, :6, :] = val_summary[:, :, :100]
+    trn_feature[:, :6, :] = trn_summary
+    val_feature[:, :6, :] = val_summary
     with torch.no_grad():
         for i in range(len(trn_summary)):
             for j, slt in enumerate(selectors):
                 feature = slt(torch.tensor(trn_set[(100*i):(100*(i+1))][0]).cuda().float())
-                trn_feature[i, 6+j] = feature.detach().cpu().numpy().squeeze()
+                trn_feature[i, 6+j, :] = feature.detach().cpu().numpy().squeeze()
         for i in range(len(val_summary)):
             for j, slt in enumerate(selectors):
                 feature = slt(torch.tensor(val_set[(100*i):(100*(i+1))][0]).cuda().float())
-                val_feature[i, 6+j] = feature.detach().cpu().numpy().squeeze()
+                val_feature[i, 6+j, :] = feature.detach().cpu().numpy().squeeze()
     np.save(folder+'predictor1_trn_feature', trn_feature)
     np.save(folder+'predictor1_val_feature', val_feature)
 
@@ -187,3 +190,8 @@ def predictor3_preprocess(folder='Severson_Dataset/feature_selector_discharge/')
                 val_feature[i, 6+j] = feature.detach().cpu().numpy().squeeze()
     np.save(folder+'predictor3_trn_feature', trn_feature)
     np.save(folder+'predictor3_val_feature', val_feature)
+
+
+# mat_to_npy()
+# train_val_split(seed=41)
+# predictor1_preprocess()
