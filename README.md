@@ -2,6 +2,10 @@
 
 復現的模型為學長發表的論文: [Deep neural network battery life and voltage prediction by using data of one cycle only](https://www.sciencedirect.com/science/article/pii/S0306261921014112?via%3Dihub)
 
+### API version
+* tensorflow==2.3.0
+* torch==1.11
+
 ### code說明
 
 * [SeversonDataset_preprocess.py](SeversonDataset_preprocess.py): 處理MIT資料集的原檔
